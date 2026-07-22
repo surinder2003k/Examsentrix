@@ -7,19 +7,6 @@ const nextConfig = {
     }
     return config;
   },
-  async rewrites() {
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3001';
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${backendUrl}/api/:path*`,
-      },
-      {
-        source: '/socket.io/:path*',
-        destination: `${backendUrl}/socket.io/:path*`,
-      },
-    ];
-  },
   allowedDevOrigins: [
     'http://localhost:3000',
     'https://localhost:3000',

@@ -9,3 +9,9 @@ dist/
 pm2*.log
 cloudflared/
 tunnel-live.log
+VERCEL_ENV_VARIABLES.txt
+proctorexam/frontend/Dashboard.jsx.fixed.txt
+proctorexam/PROJECT_DETAILS.txt
+proctorexam/backend/seed_data.js.bak
+"New Text Document - Copy.txt"
+AGENTS.md

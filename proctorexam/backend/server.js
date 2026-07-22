@@ -33,7 +33,7 @@ const supabase = createClient(
 const allowedOrigins = [
   process.env.FRONTEND_URL || 'http://localhost:3000',
   'http://localhost:3000',
-  // Allow all origins for Cloudflare tunnel testing
+  'https://examsentrix.vercel.app',
   /https:\/\/.*\.trycloudflare\.com$/,
   /https:\/\/.*\.cloudflareaccess\.com$/
 ];

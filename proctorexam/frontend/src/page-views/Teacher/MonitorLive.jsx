@@ -5,7 +5,7 @@ import { useAuth } from '@clerk/nextjs';
 import { api } from '../../utils/api';
 import { useSocket } from '../../hooks/useSocket';
 import { formatDate } from '../../utils/helpers';
-import { showConfirm } from '../../components/AlertModal';
+import { showConfirm, showAlert } from '../../components/AlertModal';
 import { useWebRTC } from '../../hooks/useWebRTC';
 
 
@@ -97,25 +97,20 @@ export default function MonitorLive() {
     };
 
     const handleStudentJoined = (data) => {
-      const exists = studentsRef.current.some(s => s.id === data.studentExamId);
-      if (exists) {
-        setStudents(prev => prev.map(s => {
-          if (s.id === data.studentExamId) {
-            return { ...s, is_online: true, socket_id: data.socketId };
-          }
-          return s;
-        }));
-      } else {
-        // Student not in list — pull fresh list after a short delay
-        setTimeout(async () => {
-          try {
-            const token = await getToken();
-            api.setToken(token);
-            const res = await api.getActiveStudents(examId);
-            setStudents(res.students || []);
-          } catch (error) { console.error('Polling error:', error); }
-        }, 500);
-      }
+      showAlert({
+        title: 'Student Joined',
+        message: `${data.studentName} is now taking the exam`,
+        severity: 'success',
+      });
+      // Pull fresh student list to include the new student
+      setTimeout(async () => {
+        try {
+          const token = await getToken();
+          api.setToken(token);
+          const res = await api.getActiveStudents(examId);
+          setStudents(res.students || []);
+        } catch (error) { console.error('Refresh error:', error); }
+      }, 500);
     };
 
     const handleStudentLeft = (data) => {
@@ -166,14 +161,14 @@ export default function MonitorLive() {
     };
 
     socket.socket.on('proctoring_update', handleProctoringUpdate);
-    socket.socket.on('student_joined', handleStudentJoined);
+    socket.socket.on('student_started_exam', handleStudentJoined);
     socket.socket.on('student_left', handleStudentLeft);
     socket.socket.on('student_online', handleStudentOnline);
     socket.socket.on('student_frame', handleStudentFrame);
 
     return () => {
       socket.socket?.off('proctoring_update', handleProctoringUpdate);
-      socket.socket?.off('student_joined', handleStudentJoined);
+      socket.socket?.off('student_started_exam', handleStudentJoined);
       socket.socket?.off('student_left', handleStudentLeft);
       socket.socket?.off('student_online', handleStudentOnline);
       socket.socket?.off('student_frame', handleStudentFrame);
@@ -301,8 +296,11 @@ export default function MonitorLive() {
             <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mt-1">Candidates</span>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col justify-between">
-            <span className="text-2xl font-bold text-green-600">{stats.online}</span>
-            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mt-1">Live/Active</span>
+            <span className="text-2xl font-bold text-green-600 flex items-center gap-2">
+              {stats.online}
+              {stats.online > 0 && <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>}
+            </span>
+            <span className="text-[10px] uppercase font-bold tracking-wider text-slate-400 mt-1">Live Now</span>
           </div>
           <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-sm flex flex-col justify-between">
             <span className="text-2xl font-bold text-slate-700">{stats.focused}</span>

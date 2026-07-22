@@ -16,6 +16,7 @@ export default function TeacherDashboard() {
   const socket = useSocket();
   const [actionLoading, setActionLoading] = useState({});
   const [filter, setFilter] = useState('all');
+  const [liveCounts, setLiveCounts] = useState({}); // { examId: count }
 
   useEffect(() => {
     fetchExams();
@@ -27,15 +28,28 @@ export default function TeacherDashboard() {
 
     const handleStudentStarted = (data) => {
       showAlert({
-        title: 'Student Started Exam',
-        message: `${data.studentName} is now taking "${data.examTitle}"`,
-        severity: 'info',
+        title: 'Student Joined',
+        message: `${data.studentName} joined "${data.examTitle}"`,
+        severity: 'success',
       });
+      setLiveCounts(prev => ({
+        ...prev,
+        [data.examId]: (prev[data.examId] || 0) + 1,
+      }));
+    };
+
+    const handleStudentLeft = (data) => {
+      setLiveCounts(prev => ({
+        ...prev,
+        [data.examId]: Math.max((prev[data.examId] || 1) - 1, 0),
+      }));
     };
 
     socket.socket.on('student_started_exam', handleStudentStarted);
+    socket.socket.on('student_left_exam', handleStudentLeft);
     return () => {
       socket.socket?.off('student_started_exam', handleStudentStarted);
+      socket.socket?.off('student_left_exam', handleStudentLeft);
     };
   }, [socket.socket, user?.id]);
 
@@ -215,8 +229,13 @@ export default function TeacherDashboard() {
                         )}
                         {exam.status === 'published' && (
                           <>
-                            <button onClick={() => router.push(`/teacher/monitor/${exam.id}`)} className="btn btn-blue btn-sm">
+                            <button onClick={() => router.push(`/teacher/monitor/${exam.id}`)} className="btn btn-blue btn-sm relative">
                               Monitor
+                              {liveCounts[exam.id] > 0 && (
+                                <span className="absolute -top-2 -right-2 bg-green-500 text-white text-[9px] font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse shadow-md">
+                                  {liveCounts[exam.id]}
+                                </span>
+                              )}
                             </button>
                             <button onClick={() => router.push(`/teacher/edit-exam/${exam.id}`)} className="btn btn-secondary btn-sm">
                               Edit

@@ -117,11 +117,10 @@ export function setupSocketHandlers(io, supabase) {
 
         socket.emit('exam_joined', { studentExamId, examId });
 
-        io.to(`monitor:${examId}`).emit('student_online', {
-          studentExamId, userId, socketId: socket.id, is_online: true
-        });
-
-        // Notify teacher that a student started the exam
+        // Fetch student name + teacher info for notifications
+        let studentName = 'A student';
+        let teacherId = null;
+        let examTitle = '';
         try {
           const { data: exam } = await supabase
             .from('exams')
@@ -129,21 +128,42 @@ export function setupSocketHandlers(io, supabase) {
             .eq('id', examId)
             .single();
           if (exam) {
+            teacherId = exam.created_by;
+            examTitle = exam.title;
             const { data: studentUser } = await supabase
               .from('users')
               .select('name, email')
               .eq('id', userId)
               .single();
-            io.to(`teacher:${exam.created_by}`).emit('student_started_exam', {
-              examId,
-              examTitle: exam.title,
-              studentName: studentUser?.name || studentUser?.email || 'A student',
-              studentExamId,
-            });
+            studentName = studentUser?.name || studentUser?.email || 'A student';
           }
         } catch (notifyErr) {
-          console.warn('[SocketHandler] Failed to notify teacher:', notifyErr.message);
+          console.warn('[SocketHandler] Failed to fetch student/exam info:', notifyErr.message);
         }
+
+        // Notify teacher on dashboard (personal room)
+        if (teacherId) {
+          io.to(`teacher:${teacherId}`).emit('student_started_exam', {
+            examId,
+            examTitle,
+            studentName,
+            studentExamId,
+          });
+        }
+
+        // Notify monitor page (monitor room)
+        io.to(`monitor:${examId}`).emit('student_started_exam', {
+          examId,
+          examTitle,
+          studentName,
+          studentExamId,
+          userId,
+        });
+
+        // Also update online status
+        io.to(`monitor:${examId}`).emit('student_online', {
+          studentExamId, userId, socketId: socket.id, is_online: true
+        });
 
         console.log(`[SocketHandler] Student ${userId} joined exam ${examId} (socket: ${socket.id})`);
       } catch (error) {
@@ -500,6 +520,21 @@ export function setupSocketHandlers(io, supabase) {
         }
         io.to(`monitor:${examId}`).emit('student_online', { studentExamId, socketId: socket.id, is_online: false });
         io.to(`monitor:${examId}`).emit('student_left', { studentExamId, socketId: socket.id });
+
+        // Notify teacher dashboard about student leaving
+        try {
+          const { data: exam } = await supabase
+            .from('exams')
+            .select('created_by')
+            .eq('id', examId)
+            .single();
+          if (exam) {
+            io.to(`teacher:${exam.created_by}`).emit('student_left_exam', {
+              examId, studentExamId, userId: socketInfo.userId,
+            });
+          }
+        } catch (e) { /* ignore */ }
+
         studentSockets.delete(socket.id);
         studentFrames.delete(studentExamId);
         console.log(`Student disconnected from exam ${examId}: ${socket.id}`);
